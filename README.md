@@ -1,5 +1,5 @@
 
-# Eris bot
+# Discord Music bot
 A simple music bot for your Discord server Based on, yt-dlp-exec
 ## Installation
 
