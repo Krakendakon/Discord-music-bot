@@ -1,0 +1,38 @@
+{
+  "name": "discord-music-bot",
+  "version": "1.0.0",
+  "description": "Our own special music bot",
+  "keywords": [
+    "Music",
+    "cool"
+  ],
+  "homepage": "https://github.com/Krakendakon/ErisBot#readme",
+  "bugs": {
+    "url": "https://github.com/Krakendakon/ErisBot/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Krakendakon/ErisBot.git"
+  },
+  "license": "ISC",
+  "author": "Kraken",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@discordjs/builders": "^1.10.1",
+    "@discordjs/rest": "^2.4.3",
+    "@discordjs/voice": "^0.18.0",
+    "discord.js": "^13.17.1",
+    "ffmpeg-static": "^5.2.0",
+    "yt-dlp-exec": "^1.0.2",
+    "ytdl-core": "^4.11.5",
+    "ytdl-core-discord": "^1.3.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.22.0",
+    "eslint": "^9.22.0"
+  }
+}
