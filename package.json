@@ -6,13 +6,13 @@
     "Music",
     "cool"
   ],
-  "homepage": "https://github.com/Krakendakon/ErisBot#readme",
+  "homepage": "https://github.com/Krakendakon/Discord-music-bot#readme",
   "bugs": {
-    "url": "https://github.com/Krakendakon/ErisBot/issues"
+    "url": "https://github.com/Krakendakon/Discord-music-bot/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Krakendakon/ErisBot.git"
+    "url": "git+https://github.com/Krakendakon/Discord-music-bot.git"
   },
   "license": "ISC",
   "author": "Kraken",
