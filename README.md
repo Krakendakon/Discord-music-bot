@@ -8,7 +8,7 @@ To get started, you'll need to install the required dependencies. Run the follow
 
 ```
 npm init -y
-npm install discord.js @discordjs/voice yt-dlp-exec @discordjs/rest @discordjs/builders ffmpeg-static
+npm install
 ```
 
 
@@ -20,15 +20,17 @@ This will install all the necessary packages for the bot.
 Once installed, you can run the bot using the following command:
 
 
-
-bash node deploy-commands.js node bot.js
-
-
+```
+node deploy-commands.js
+node bot.js
+```
 
 
 The first command (`deploy-commands.js`) sets up some initial commands and configurations. The second command (`bot.js`) starts the actual music bot.
 
-Note: Make sure to replace `YOUR_BOT_TOKEN` with your actual Discord bot token in the `config.json` file.
+Note: Make sure to replace `YOUR_BOT_TOKEN`, `YOUR_CLIENT_ID`,`YOUR_SERVER_ID` with your actual Discord bot token, client id and server id in the `config.json` file.
+
+You can invite the bot to the server with the discord invite link generated after running the bot.
 
 ## Configuration
 

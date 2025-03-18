@@ -98,7 +98,10 @@ async function playNextSong(queueData) {
       songQueue.get(guildId).currentSong = queue[0];
       playNextSong({ queue, connection, player, guildId });
     } else {
-      connection.destroy();
+      if (connection.state.status !== "destroyed") {
+        connection.destroy();
+    }
+    
       songQueue.delete(guildId);  // Clear the queue
     }
   });

@@ -2,7 +2,7 @@ const { Client, Intents } = require('discord.js');
 const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, StreamType, getVoiceConnection } = require('@discordjs/voice');
 const fs = require('fs');  // Import fs module
 const path = require('path');  // Import path module
-const { token } = require('./config.json');  // Load token from config.json
+const { token, clientId } = require('./config.json');  // Load token and clientId from config.json
 
 const client = new Client({
     intents: [
@@ -24,6 +24,13 @@ for (const file of commandFiles) {
 
 client.once('ready', () => {
     console.log('Bot is online!');
+    
+    // Generate bot invite link using clientId
+    const permissions = 2147483647; // Full admin permissions, adjust if needed
+    const inviteLink = `https://discord.com/oauth2/authorize?client_id=${clientId}&permissions=${permissions}&scope=bot`;
+
+    // Log the invite link to the console
+    console.log(`Invite the bot using this link: ${inviteLink}`);
 });
 
 // Register commands when the bot joins a new guild
@@ -59,7 +66,4 @@ client.on('interactionCreate', async interaction => {
 // Login the bot using the token from config.json
 client.login(token);
 
-// Export the songQueue so that it's accessible in other files
-module.exports = {
-    songQueue,
-};
+// Export the songQueue so
