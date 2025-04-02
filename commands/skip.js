@@ -1,33 +1,53 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
-// Import songQueue and playNextSong from play.js (same directory)
-const { songQueue, playNextSong } = require('./play');
+const { songQueue, playNextSong } = require('./play');  // Import the play logic
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('skip')
-    .setDescription('Skip the current song and play the next one'),
+    .setDescription('Skip the current song and play the next one')
+    .addIntegerOption(option =>
+      option.setName('count')
+        .setDescription('The number of songs to skip')
+        .setRequired(false)
+    ),
 
   async execute(interaction) {
+    await interaction.deferReply(); // Immediately defer to prevent timeout
+
     const guildId = interaction.guild.id;
     const queueData = songQueue.get(guildId);
 
-    // Check if there is a song playing or in the queue
+    // Get the number of songs to skip, default to 1 if not provided
+    const skipCount = interaction.options.getInteger('count') || 1;
+
+    console.log(`Received /skip command in guild ${guildId} with skip count: ${skipCount}`);
+
+    // Check if there are any songs in the queue
     if (!queueData || !queueData.queue.length) {
-      return interaction.reply('There are no songs in the queue to skip.');
+      console.log(`No songs in the queue for guild ${guildId}.`);
+      return interaction.editReply('There are no songs in the queue to skip.');
     }
 
-    // Skip the current song
-    queueData.queue.shift(); // Remove the current song from the queue
-    queueData.currentSong = queueData.queue[0] || null;  // Set the current song to the next song, or null if no songs left
+    console.log(`Queue before skipping in guild ${guildId}:`, queueData.queue);
 
-    // If there is a next song, continue playing it
+    // Ensure we don't try to skip more songs than are in the queue
+    const songsToSkip = Math.min(skipCount, queueData.queue.length);
+    queueData.queue.splice(0, songsToSkip); // Remove the skipped songs
+    queueData.currentSong = queueData.queue[0] || null; // Set the next song or null if no songs are left
+
+    // If there are still songs in the queue, play the next one
     if (queueData.queue.length > 0) {
-      await playNextSong({ queue: queueData.queue, connection: queueData.connection, player: queueData.player, guildId });
-      await interaction.reply('Skipped the current song.');
+      console.log(`Skipping ${songsToSkip} song(s). Next song: ${queueData.currentSong}`);
+      await playNextSong(guildId);  // Call playNextSong directly, passing the guildId
+      await interaction.editReply(`Skipped ${songsToSkip} song(s).`);
     } else {
-      queueData.connection.destroy();  // No more songs, disconnect
-      songQueue.delete(guildId);  // Clear the queue
-      await interaction.reply('No more songs in the queue. Disconnected.');
+      // If the queue is empty, disconnect
+      console.log(`Queue empty in guild ${guildId}. Disconnecting.`);
+      queueData.connection.destroy();
+      songQueue.delete(guildId);
+      await interaction.editReply('No more songs in the queue. Disconnected.');
     }
+
+    console.log(`Queue after skipping in guild ${guildId}:`, queueData.queue);
   },
 };

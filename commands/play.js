@@ -1,112 +1,177 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
-const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, StreamType } = require('@discordjs/voice');
-const ytdl = require('yt-dlp-exec');  // yt-dlp-exec module for calling yt-dlp
-
-// Create and export songQueue so it can be accessed in skip.js
-const songQueue = new Map();
+const { 
+  joinVoiceChannel, 
+  createAudioPlayer, 
+  createAudioResource, 
+  AudioPlayerStatus, 
+  StreamType 
+} = require('@discordjs/voice');
+const { spawn } = require('child_process'); // Use spawn for yt-dlp
+const ytsr = require('ytsr');  // YouTube Search API
+const songQueue = new Map(); // Global queue
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('play')
-    .setDescription('Play a YouTube song in the voice channel')
-    .addStringOption(option =>
-      option.setName('url')
-        .setDescription('The URL of the YouTube video')
+    .setDescription('Play a song in the voice channel')
+    .addStringOption(option => 
+      option.setName('input')
+        .setDescription('The YouTube URL or search query')
         .setRequired(true)
     ),
 
   async execute(interaction) {
-    const url = interaction.options.getString('url');  // Get URL from command option
+    await interaction.deferReply(); // Prevent timeout while fetching songs
 
-    if (!url) {
-      return interaction.reply('Please provide a valid YouTube URL.');
+    const input = interaction.options.getString('input');
+    let videoUrls = [];
+
+    // Check if input is a URL or a query
+    if (isValidUrl(input)) {
+      console.log(`Received /play command with URL: ${input}`);
+      if (input.includes("list=")) {
+        videoUrls = await getPlaylistVideos(input);
+        if (videoUrls.length === 0) {
+          return interaction.editReply("Failed to fetch playlist videos.");
+        }
+      } else {
+        videoUrls = [input];
+      }
+    } else {
+      console.log(`Received /play command with query: ${input}`);
+      videoUrls = await searchYouTube(input);
+      if (videoUrls.length === 0) {
+        return interaction.editReply("No videos found for the search query.");
+      }
     }
 
-    try {
-      if (!interaction.member.voice.channel) {
-        return interaction.reply('You need to join a voice channel first!');
-      }
+    const guildId = interaction.guild.id;
+    if (!songQueue.has(guildId)) {
+      songQueue.set(guildId, { queue: [], connection: null, player: null });
+    }
 
-      const guildId = interaction.guild.id;
-      if (!songQueue.has(guildId)) {
-        songQueue.set(guildId, { queue: [], connection: null, player: null, currentSong: null });
-      }
+    const queue = songQueue.get(guildId).queue;
+    queue.push(...videoUrls);
 
-      const queue = songQueue.get(guildId).queue;
-      queue.push(url);  // Add new song to the queue
+    console.log(`Queue for guild ${guildId}:`, queue);
 
-      console.log(`Received /play command with URL: ${url}`);
-      console.log(`Queue for guild ${guildId}:`, queue);  // Debugging log
+    if (queue.length === videoUrls.length) {
+      // Create a new voice connection if none exists
+      const connection = joinVoiceChannel({
+        channelId: interaction.member.voice.channel.id,
+        guildId: interaction.guild.id,
+        adapterCreator: interaction.guild.voiceAdapterCreator,
+      });
 
-      if (queue.length === 1) {
-        const connection = joinVoiceChannel({
-          channelId: interaction.member.voice.channel.id,
-          guildId: interaction.guild.id,
-          adapterCreator: interaction.guild.voiceAdapterCreator,
-        });
+      const player = createAudioPlayer();
+      songQueue.get(guildId).connection = connection;
+      songQueue.get(guildId).player = player;
+      connection.subscribe(player);
 
-        const player = createAudioPlayer();
-
-        songQueue.get(guildId).connection = connection;
-        songQueue.get(guildId).player = player;
-        songQueue.get(guildId).currentSong = url;
-
-        await playNextSong({ queue, connection, player, guildId });
-
-        await interaction.reply(`Now playing: ${url}`);
-      } else {
-        await interaction.reply(`Added to queue: ${url}`);
-      }
-    } catch (error) {
-      console.error(error);
-      await interaction.reply('There was an error trying to play the song.');
+      await interaction.editReply(`Now playing: ${videoUrls[0]}`);
+      playNextSong(guildId);
+    } else {
+      await interaction.editReply(`Added ${videoUrls.length} songs to the queue.`);
     }
   },
 };
 
-async function playNextSong(queueData) {
-  const { queue, connection, player, guildId } = queueData;
+// Function to check if a string is a valid URL
+function isValidUrl(url) {
+  const regex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+$/;
+  return regex.test(url);
+}
 
-  let nextSongUrl = queueData.currentSong ? queue[0] : null;
-  if (!nextSongUrl) {
-    nextSongUrl = queue[0];
+// Function to search for a song on YouTube and return the best match
+async function searchYouTube(query) {
+  try {
+    const searchResults = await ytsr(query, { limit: 1 }); // Only get the best match
+    if (searchResults.items.length > 0) {
+      const videoUrls = searchResults.items
+        .filter(item => item.type === 'video')
+        .map(item => item.url);
+
+      return videoUrls;
+    } else {
+      return [];
+    }
+  } catch (error) {
+    console.error('Error searching YouTube:', error);
+    return [];
   }
+}
 
-  console.log(`playNextSong called for guild ${guildId}. Queue length: ${queue.length}`);
-  console.log(`Next song URL: ${nextSongUrl}`);  // Debugging log
+// Function to fetch playlist videos
+async function getPlaylistVideos(playlistUrl) {
+  return new Promise((resolve, reject) => {
+    const process = spawn('yt-dlp', ['-j', playlistUrl, '--flat-playlist']);
 
-  const audioStream = ytdl.exec(nextSongUrl, {
-    output: '-',
-    format: 'bestaudio',
-    quiet: true,
-  }, { stdio: ['ignore', 'pipe', 'ignore'] });
+    let output = '';
+    process.stdout.on('data', data => {
+      output += data.toString();
+    });
 
-  const audioUrl = audioStream.stdout;
+    process.on('close', () => {
+      try {
+        const playlistData = output
+          .split('\n')
+          .filter(line => line.trim() !== '')
+          .map(line => JSON.parse(line))
+          .map(item => `https://www.youtube.com/watch?v=${item.id}`);
 
-  console.log(`Playing song from URL: ${nextSongUrl}`);  // Debugging log
-
-  const resource = createAudioResource(audioUrl, {
-    inputType: StreamType.Arbitrary,
+        resolve(playlistData);
+      } catch (error) {
+        console.error('Error fetching playlist:', error);
+        reject(error);
+      }
+    });
   });
+}
+
+// Function to play the next song in the queue
+async function playNextSong(guildId) {
+  const queueData = songQueue.get(guildId);
+  if (!queueData || queueData.queue.length === 0) return;
+
+  const { queue, connection, player } = queueData;
+  const nextSongUrl = queue[0]; // Get first song in queue
+
+  console.log(`Playing next song for guild ${guildId}: ${nextSongUrl}`);
+
+  const process = spawn('yt-dlp', [
+    '-f', 'bestaudio',
+    '-o', '-',
+    '--quiet', '--no-warnings',
+    nextSongUrl
+  ], { stdio: ['ignore', 'pipe', 'ignore'] });
+
+  const resource = createAudioResource(process.stdout, { inputType: StreamType.Arbitrary });
 
   player.play(resource);
-  connection.subscribe(player);
 
-  player.on(AudioPlayerStatus.Idle, () => {
-    queue.shift();  // Remove the song from the queue once it's finished
+  player.once(AudioPlayerStatus.Idle, () => {
+    queue.shift(); // Remove the finished song
     if (queue.length > 0) {
-      songQueue.get(guildId).currentSong = queue[0];
-      playNextSong({ queue, connection, player, guildId });
+      playNextSong(guildId);
     } else {
-      if (connection.state.status !== "destroyed") {
-        connection.destroy();
+      console.log(`Queue empty for guild ${guildId}, disconnecting.`);
+      connection.destroy();
+      songQueue.delete(guildId);
     }
-    
-      songQueue.delete(guildId);  // Clear the queue
+  });
+
+  player.once('error', (error) => {
+    console.error(`Error playing audio: ${error.message}`);
+    queue.shift(); // Skip the problematic song
+    if (queue.length > 0) {
+      playNextSong(guildId);
+    } else {
+      connection.destroy();
+      songQueue.delete(guildId);
     }
   });
 }
 
-// Export songQueue for access in skip.js
+// Export songQueue so other commands can interact with it
 module.exports.songQueue = songQueue;
 module.exports.playNextSong = playNextSong;
