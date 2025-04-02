@@ -27,7 +27,7 @@ client.once('ready', () => {
     
     // Generate bot invite link using clientId
     const permissions = 2147483647; // Full admin permissions, adjust if needed
-    const inviteLink = `https://discord.com/oauth2/authorize?client_id=${clientId}&permissions=${permissions}&scope=bot`;
+    const inviteLink = `https://discord.com/oauth2/authorize?client_id=${clientId}&permissions=${permissions}&scope=bot+applications.commands`;
 
     // Log the invite link to the console
     console.log(`Invite the bot using this link: ${inviteLink}`);
